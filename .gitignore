@@ -1,0 +1,4 @@
+# exclude datasets
+data/
+data_raw/
+checkpoints/
