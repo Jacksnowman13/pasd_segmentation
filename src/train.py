@@ -135,7 +135,7 @@ def main():
         model = load_fair_vit(args.num_classes)
         optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     else:
-        raise ValueError(f"Unknown model_type: {args.model_type}")
+        raise ValueError(f"Unknown model_type")
 
     device = "cpu"
     if torch.cuda.is_available():

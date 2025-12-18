@@ -1,5 +1,6 @@
 import torch.nn as nn
 from torchvision.models.segmentation import deeplabv3_resnet50
+
 #Legacy model of DeepLabV3 with ResNet50 backbone, used in my poster session 
 def load_deeplab(num_classes: int, pretrained: bool = True):
     model = deeplabv3_resnet50(pretrained=pretrained, progress=True)
