@@ -82,7 +82,7 @@ def load_model(model_type, num_classes, ckpt_path, device):
 
 @torch.no_grad()
 def run_eval(model, loader, device, model_type, num_classes):
-    hf_models = ["segformer", "fair_cnn", "fair_vit"]
+    hf_models = ["fair_cnn", "fair_vit"]
     conf_mat = torch.zeros((num_classes, num_classes), dtype=torch.int64, device="cpu")
 
     for imgs, masks in tqdm(loader, desc="Evaluating", leave=True):
