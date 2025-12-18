@@ -43,7 +43,7 @@ def plot_from_rows(rows, metric, out_png, title):
     plt.savefig(out_png, dpi=200, bbox_inches="tight")
     plt.close()
 
-
+# AI assisted with argument parsing and folder creation
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", type=str, choices=["single", "all"], default="all",
@@ -59,20 +59,20 @@ def main():
 
     if args.mode == "single":
         if args.csv is None:
-            raise ValueError("--csv is required in single mode")
+            raise ValueError("Issues")
 
         rows = read_csv(args.csv)
         occ_type = rows[0]["occ_type"] if rows else "unknown"
         base = os.path.splitext(os.path.basename(args.csv))[0]
         out_png = os.path.join(args.out_dir, f"{base}_{args.metric}.png")
         plot_from_rows(rows, args.metric, out_png, f"{occ_type} occlusion ({args.metric})")
-        print("Saved:", out_png)
         return
+    
 
     for occ in ["box", "line", "random"]:
         csv_path = os.path.join(args.csv_dir, f"occlusion_sweep_{occ}.csv")
         if not os.path.exists(csv_path):
-            raise FileNotFoundError(f"Missing CSV: {csv_path}. Run sweep_occlusion.py first.")
+            raise FileNotFoundError("Missing CSV stuff")
 
         rows = read_csv(csv_path)
 
@@ -81,11 +81,6 @@ def main():
 
         plot_from_rows(rows, "occ_miou", out1, f"{occ} occlusion: occluded mIoU vs severity")
         plot_from_rows(rows, "delta_miou", out2, f"{occ} occlusion: ΔmIoU vs severity")
-
-        print("Saved:", out1)
-        print("Saved:", out2)
-
-    print("\nDone. You should now have 6 plots in:", args.out_dir)
 
 
 if __name__ == "__main__":

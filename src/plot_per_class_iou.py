@@ -16,6 +16,7 @@ def load_iou(confmat_path):
     iou, miou = compute_iou_from_confusion(hist)
     return iou.numpy(), miou
 
+#AI Assisted woth argument parsing and help
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--confmat_a", type=str, required=True, help="Path to model A confmat .pt")

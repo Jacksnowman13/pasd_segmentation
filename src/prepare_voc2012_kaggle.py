@@ -2,10 +2,8 @@ import os
 import shutil
 import random
 
-# adjust if your path is slightly different
 VOC_ROOT = r"C:\projects\pasd_segmentation\data_raw\archive\VOC2012"
 
-# Try standard names first; if yours differ, change these strings.
 JPEG_DIR = os.path.join(VOC_ROOT, "JPEGImages")
 SEG_DIR = os.path.join(VOC_ROOT, "SegmentationClass")
 
@@ -36,7 +34,6 @@ def copy_ids(id_list, out_img_dir, out_mask_dir):
         shutil.copy2(img_src, img_dst)
         shutil.copy2(mask_src, mask_dst)
         copied += 1
-    print(f"Copied {copied} pairs into {out_img_dir} and {out_mask_dir}")
 
 def main():
     mask_files = [
@@ -51,8 +48,6 @@ def main():
     split_idx = int(0.8 * len(ids))
     train_ids = ids[:split_idx]
     val_ids = ids[split_idx:]
-
-    print(f"Total images: {len(ids)} | train: {len(train_ids)}, val: {len(val_ids)}")
 
     copy_ids(train_ids, OUT_TRAIN_IMG, OUT_TRAIN_MASK)
     copy_ids(val_ids, OUT_VAL_IMG, OUT_VAL_MASK)

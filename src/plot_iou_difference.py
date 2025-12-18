@@ -17,6 +17,7 @@ def load_iou(confmat_path):
     return iou.numpy(), miou
 
 def main():
+    # Argument parsing AI assisted
     parser = argparse.ArgumentParser()
     parser.add_argument("--confmat_ref", type=str, required=True, help="Reference model confmat .pt (subtracted)")
     parser.add_argument("--label_ref", type=str, default="Ref")

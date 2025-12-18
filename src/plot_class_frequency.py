@@ -59,8 +59,8 @@ def plot_counts(counts_arr, title, out_path):
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
-    print(f"Saved class-frequency plot to {out_path}")
 
+#AI helped with this main, making sure it made folders and put the images in those folders
 def main():
     train_img_dir = r"..\data\images_train"
     train_mask_dir = r"..\data\masks_train"

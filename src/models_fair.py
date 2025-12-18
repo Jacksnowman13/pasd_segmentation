@@ -1,5 +1,5 @@
 from transformers import UperNetForSemanticSegmentation
-
+#Current models being used 
 def load_fair_cnn(num_classes: int):
     return UperNetForSemanticSegmentation.from_pretrained(
         "openmmlab/upernet-convnext-tiny",

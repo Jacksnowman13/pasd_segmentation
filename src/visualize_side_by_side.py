@@ -85,7 +85,7 @@ def save_side_by_side(img_tensor, gt_mask, pred_a, pred_b, cmap, out_path, label
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
 
-
+# AI assisted
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--val_img_dir", type=str, default=r"..\data\images_val")
@@ -131,7 +131,6 @@ def main():
         save_side_by_side(img_tensor, mask_tensor, pred_a, pred_b, cmap, out_path, args.label_a, args.label_b)
         print(f"Saved: {out_path}")
 
-    print("Done:", out_root)
 
 
 if __name__ == "__main__":

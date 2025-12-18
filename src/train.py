@@ -17,9 +17,6 @@ from models_fair import load_fair_cnn, load_fair_vit
 def get_dataloaders(train_img_dir, train_mask_dir,
                     val_img_dir, val_mask_dir,
                     batch_size):
-    """
-    Build train / val dataloaders with a simple Resize(512,512) transform.
-    """
     transform = A.Compose([
         A.Resize(512, 512),
     ])
@@ -45,9 +42,6 @@ def get_dataloaders(train_img_dir, train_mask_dir,
 
 
 def train_one_epoch(model, train_loader, optimizer, device, model_type, num_classes):
-    """
-    Single-epoch training loop.
-    """
     model.train()
     total_loss = 0.0
 
@@ -72,7 +66,7 @@ def train_one_epoch(model, train_loader, optimizer, device, model_type, num_clas
             outputs = model(imgs)
             logits = outputs["out"]
         else:
-            raise ValueError(f"Unknown model_type: {model_type}")
+            raise ValueError("Uknown model type")
 
         targets = masks.clone().long()
         invalid = (targets < 0) | (targets >= num_classes)
@@ -87,7 +81,7 @@ def train_one_epoch(model, train_loader, optimizer, device, model_type, num_clas
 
     return total_loss / len(train_loader)
 
-
+# AI assisted here with argument parsing and folder creation
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--train_img_dir", type=str, default=r"..\data\images_train")
@@ -138,6 +132,7 @@ def main():
         raise ValueError(f"Unknown model_type: {args.model_type}")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    #Debug to make sure we are using cuda
     print("Using device:", device)
     model.to(device)
 

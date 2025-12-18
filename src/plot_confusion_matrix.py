@@ -53,7 +53,7 @@ def build_model(model_type, num_classes, checkpoint_path, device):
     elif model_type == "fair_vit":
         model = load_fair_vit(num_classes)
     else:
-        raise ValueError(f"Unknown model_type: {model_type}")
+        raise ValueError("Uknown model type?")
 
     state_dict = torch.load(checkpoint_path, map_location="cpu")
     model.load_state_dict(state_dict)
@@ -113,6 +113,7 @@ def plot_cm_sklearn(cm, class_names, title, out_path, values_format=None, figsiz
 
 
 def main():
+    #AI asisted in argument parsing and making sure the folders were created for saving images
     parser = argparse.ArgumentParser()
     parser.add_argument("--val_img_dir", type=str, default=r"..\data\images_val")
     parser.add_argument("--val_mask_dir", type=str, default=r"..\data\masks_val")

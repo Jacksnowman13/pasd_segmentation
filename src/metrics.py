@@ -1,7 +1,7 @@
 import torch
 
 def _fast_hist(pred, label, num_classes):
-    # Ignore labels outside [0, num_classes-1] (e.g., 255 = ignore)
+    #Ignore index to be used
     mask = (label >= 0) & (label < num_classes)
     hist = torch.bincount(
         num_classes * label[mask] + pred[mask],
@@ -16,18 +16,13 @@ def compute_confusion_matrix(preds, labels, num_classes):
     return hist
 
 def compute_iou_from_confusion(hist):
-    """
-    Returns:
-      iou: per-class IoU, length = num_classes
-      miou: mean IoU over classes that actually appear (union > 0)
-    """
     hist = hist.float()
     tp = torch.diag(hist)
     fp = hist.sum(dim=0) - tp
     fn = hist.sum(dim=1) - tp
 
-    denom = tp + fp + fn  # no eps here
-    valid = denom > 0      # classes that appear in GT or preds
+    denom = tp + fp + fn 
+    valid = denom > 0      
 
     iou = torch.zeros_like(tp)
     iou[valid] = tp[valid] / denom[valid]

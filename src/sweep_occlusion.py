@@ -16,15 +16,10 @@ def run_one(model_type, ckpt, occ_type, severity, seed, num_classes, batch_size)
         "--severity", f"{severity:.2f}",
         "--seed", str(seed),
     ]
-    print("\n>>", " ".join(cmd))
     subprocess.run(cmd, check=True)
 
 
 def collect_rows(eval_dir, occ_type, severities):
-    """
-    Reads the saved .pt files produced by eval_occlusion.py and returns rows for CSV.
-    Expects files named: {model_type}_{occ_type}_sev{severity:.2f}.pt
-    """
     import torch
 
     rows = []
@@ -44,7 +39,6 @@ def collect_rows(eval_dir, occ_type, severities):
                 "seed": int(d.get("seed", -1)),
             })
 
-    # sort for nice plotting
     rows = sorted(rows, key=lambda r: (r["model_type"], r["severity"]))
     return rows
 
@@ -59,7 +53,7 @@ def write_csv(path, rows):
         writer.writeheader()
         writer.writerows(rows)
 
-
+# AI assisted with argument parsing and folder creation
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--num_classes", type=int, default=21)
@@ -99,8 +93,6 @@ def main():
         write_csv(out_csv, rows)
         print(f"\nSaved CSV: {out_csv}")
 
-    print("\nDone. Next run:")
-    print("  python plot_occlusion_curve.py --mode all")
 
 
 if __name__ == "__main__":

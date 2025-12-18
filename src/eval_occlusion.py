@@ -17,6 +17,7 @@ from models_fair import load_fair_cnn, load_fair_vit
 
 IGNORE_INDEX = 255
 
+#Contains legacy code evaluating the previous models I was training and testing
 
 def get_dataloader(img_dir, mask_dir, batch_size):
     transform = A.Compose([
@@ -27,7 +28,7 @@ def get_dataloader(img_dir, mask_dir, batch_size):
         ds,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=4,
+        num_workers=4, # Was initally 0, adjusted to 4 to speed up training
         pin_memory=True,
         persistent_workers=True
     )
@@ -35,10 +36,6 @@ def get_dataloader(img_dir, mask_dir, batch_size):
 
 
 def apply_box_occlusion(imgs, box_frac=0.25, value=0.0):
-    """
-    imgs: [B,3,H,W] float
-    box_frac: fraction of min(H,W) used as box side length
-    """
     b, c, h, w = imgs.shape
     side = max(1, int(min(h, w) * box_frac))
 
@@ -51,10 +48,6 @@ def apply_box_occlusion(imgs, box_frac=0.25, value=0.0):
 
 
 def apply_line_occlusion(imgs, band_frac=0.12, value=0.0):
-    """
-    Horizontal band occlusion.
-    band_frac: fraction of H
-    """
     b, c, h, w = imgs.shape
     band = max(1, int(h * band_frac))
 
@@ -66,10 +59,6 @@ def apply_line_occlusion(imgs, band_frac=0.12, value=0.0):
 
 
 def apply_random_cutout(imgs, cutout_frac=0.20, n_holes=8, value=0.0):
-    """
-    Random cutout-style holes.
-    cutout_frac: hole side is fraction of min(H,W)
-    """
     b, c, h, w = imgs.shape
     side = max(1, int(min(h, w) * cutout_frac))
 
@@ -111,10 +100,10 @@ def load_model(model_type, num_classes, ckpt_path, device):
     elif model_type == "fair_vit":
         model = load_fair_vit(num_classes)
     else:
-        raise ValueError(f"Unknown model_type: {model_type}")
+        raise ValueError("ERROR BEN!")
 
     if ckpt_path is None or not os.path.exists(ckpt_path):
-        raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
+        raise FileNotFoundError("CHECKPOINT ERROR BEN")
 
     state = torch.load(ckpt_path, map_location="cpu")
     model.load_state_dict(state)
@@ -133,7 +122,7 @@ def infer_logits(model, imgs, model_type):
         outputs = model(imgs)
         return outputs["out"]
     else:
-        raise ValueError(f"Unknown model_type: {model_type}")
+        raise ValueError("WHAT IS THIS MODEL BEN")
 
 
 @torch.no_grad()
@@ -145,25 +134,20 @@ def run_occlusion_eval(model, loader, device, model_type, num_classes, occ_type,
         imgs = imgs.to(device, non_blocking=True)
         masks = masks.to(device, non_blocking=True)
 
-        # Clean
         logits_clean = infer_logits(model, imgs, model_type)
         logits_clean = F.interpolate(logits_clean, size=masks.shape[-2:], mode="bilinear", align_corners=False)
         preds_clean = torch.argmax(logits_clean, dim=1).long()
 
         clean_conf = update_confusion_matrix(clean_conf, preds_clean.cpu(), masks.cpu(), num_classes)
 
-        # Occluded
         if occ_type == "box":
             imgs_occ = apply_box_occlusion(imgs, box_frac=severity, value=0.0)
         elif occ_type == "line":
             imgs_occ = apply_line_occlusion(imgs, band_frac=severity, value=0.0)
         elif occ_type == "random":
-            # map severity into cutout_frac and hole count a bit
             cutout_frac = min(0.35, max(0.05, severity))
             n_holes = int(4 + 16 * severity)
-            imgs_occ = apply_random_cutout(imgs, cutout_frac=cutout_frac, n_holes=n_holes, value=0.0)
-        else:
-            raise ValueError("occ_type must be one of: box, line, random")
+            imgs_occ = apply_random_cutout(imgs, cutout_frac=cutout_frac, n_holes=n_holes, value=0.0)")
 
         logits_occ = infer_logits(model, imgs_occ, model_type)
         logits_occ = F.interpolate(logits_occ, size=masks.shape[-2:], mode="bilinear", align_corners=False)
@@ -181,6 +165,7 @@ def run_occlusion_eval(model, loader, device, model_type, num_classes, occ_type,
 
 
 def main():
+    # AI assisted here with argument parsing
     parser = argparse.ArgumentParser()
     parser.add_argument("--img_dir", type=str, default=r"..\data\images_val")
     parser.add_argument("--mask_dir", type=str, default=r"..\data\masks_val")
@@ -197,7 +182,7 @@ def main():
 
     random.seed(args.seed)
     torch.manual_seed(args.seed)
-
+    #And to help track if it was CUDA 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Using device:", device)
     print("Model:", args.model_type)
@@ -219,7 +204,7 @@ def main():
     print("\nPer-class IoU (clean -> occluded):")
     for c in range(args.num_classes):
         print(f"  class {c:02d}: {clean_iou[c].item():.4f} -> {occ_iou[c].item():.4f}")
-
+    #And this saving, all done with the help of AI 
     os.makedirs(r"..\eval_outputs", exist_ok=True)
     out_path = os.path.join(r"..\eval_outputs", f"{args.model_type}_{args.occ_type}_sev{args.severity:.2f}.pt")
     torch.save({

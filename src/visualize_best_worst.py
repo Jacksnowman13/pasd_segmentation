@@ -109,7 +109,7 @@ def save_triptych(img_tensor, gt_mask, pred_mask, cmap, out_path, title=None):
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
 
-
+# AI assisted
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--val_img_dir", type=str, default=r"..\data\images_val")
@@ -159,8 +159,6 @@ def main():
         preds = predict_mask(model, img_tensor, mask_tensor, device, args.model_type)
         out_path = os.path.join(out_root, f"best_{rank}_idx{idx}_miou{miou:.3f}.png")
         save_triptych(img_tensor, mask_tensor, preds, cmap, out_path, title=f"Best {rank} (idx={idx}, mIoU={miou:.3f})")
-
-    print(f"Saved best/worst examples under {out_root}")
 
 
 if __name__ == "__main__":

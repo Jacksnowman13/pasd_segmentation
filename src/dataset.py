@@ -11,15 +11,17 @@ class PASDDataset(Dataset):
         self.mask_dir = mask_dir
         self.transform = transform
 
+        # AI assisted here 
         self.image_files = sorted([
             f for f in os.listdir(img_dir)
             if f.lower().endswith((".jpg", ".jpeg", ".png"))
         ])
         self.mask_files = sorted([
             f for f in os.listdir(mask_dir)
-            if f.lower().endswith((".png",))  # VOC masks are PNG
+            if f.lower().endswith((".png",)) 
         ])
-        assert len(self.image_files) == len(self.mask_files), "Mismatch img/mask count"
+        assert len(self.image_files) == len(self.mask_files), "Checks for image/mask count are same" 
+        # Ends here 
 
     def __len__(self):
         return len(self.image_files)
@@ -33,7 +35,7 @@ class PASDDataset(Dataset):
 
         img = cv2.imread(img_path, cv2.IMREAD_COLOR)
         if img is None:
-            raise FileNotFoundError(f"Image not found: {img_path}")
+            raise FileNotFoundError("ERROR! BEN")
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         mask = np.array(Image.open(mask_path), dtype=np.uint8)
@@ -44,7 +46,7 @@ class PASDDataset(Dataset):
             mask = aug["mask"]
 
         img = img.astype(np.float32) / 255.0
-        img = np.transpose(img, (2, 0, 1))  # HWC -> CHW
+        img = np.transpose(img, (2, 0, 1)) 
         img_tensor = torch.from_numpy(img)
         mask_tensor = torch.from_numpy(mask.astype(np.int64))
 

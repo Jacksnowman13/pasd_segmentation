@@ -25,7 +25,7 @@ def try_plot(logs_dir, model_type, label=None):
     plt.plot(epochs, losses, label=label or model_type)
     return True
 
-
+# Again, AI assisted. 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--logs_dir", type=str, default=r"..\logs")

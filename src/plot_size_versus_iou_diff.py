@@ -13,7 +13,7 @@ def load_iou(confmat_path):
     iou, miou = compute_iou_from_confusion(hist)
     return iou.numpy(), miou
 
-
+# Bascially all of these main functions are AI assisted because the argument parsing is hard to understand
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--confmat_ref", type=str, required=True)
@@ -23,7 +23,6 @@ def main():
     parser.add_argument("--out_name", type=str, default="size_vs_delta_iou.png")
     args = parser.parse_args()
 
-    # 1) Val class frequencies
     val_img_dir = r"..\data\images_val"
     val_mask_dir = r"..\data\masks_val"
     counts = count_labels(val_img_dir, val_mask_dir)
@@ -31,7 +30,6 @@ def main():
     freq[freq == 0] = 1.0
     log_freq = np.log10(freq)
 
-    # 2) IoU diff
     iou_ref, _ = load_iou(args.confmat_ref)
     iou_cmp, _ = load_iou(args.confmat_cmp)
     diff = iou_cmp - iou_ref
@@ -50,7 +48,6 @@ def main():
     out_path = os.path.join(r"..\figures", args.out_name)
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
-    print(f"Saved scatter plot to {out_path}")
 
 
 if __name__ == "__main__":

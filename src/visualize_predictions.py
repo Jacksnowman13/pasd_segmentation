@@ -65,7 +65,7 @@ def forward_logits(model, imgs, masks, model_type):
     logits = F.interpolate(logits, size=masks.shape[-2:], mode="bilinear", align_corners=False)
     return logits
 
-
+#Ai Assisted
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--val_img_dir", type=str, default=r"..\data\images_val")
@@ -121,8 +121,6 @@ def main():
         count += 1
         if count >= args.num_images:
             break
-
-    print("Saved visuals to:", out_dir)
 
 
 if __name__ == "__main__":

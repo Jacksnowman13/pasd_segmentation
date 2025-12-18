@@ -35,10 +35,6 @@ def get_dataloader(img_dir, mask_dir, batch_size):
 
 @torch.no_grad()
 def update_confusion_matrix(conf_mat, preds, targets, num_classes):
-    """
-    preds: [B,H,W] long
-    targets: [B,H,W] long
-    """
     valid = (targets != IGNORE_INDEX) & (targets >= 0) & (targets < num_classes)
     t = targets[valid].view(-1)
     p = preds[valid].view(-1)
@@ -48,9 +44,6 @@ def update_confusion_matrix(conf_mat, preds, targets, num_classes):
 
 
 def compute_iou_from_confmat(conf_mat):
-    """
-    conf_mat[i,j] = count of GT=i predicted=j
-    """
     tp = torch.diag(conf_mat)
     fp = conf_mat.sum(dim=0) - tp
     fn = conf_mat.sum(dim=1) - tp
@@ -118,6 +111,7 @@ def run_eval(model, loader, device, model_type, num_classes):
 
 
 def main():
+    # Technically AI Assisted since I took the help from eval_occlusion and used it here.
     parser = argparse.ArgumentParser()
     parser.add_argument("--img_dir", type=str, default=r"..\data\images_val")
     parser.add_argument("--mask_dir", type=str, default=r"..\data\masks_val")
