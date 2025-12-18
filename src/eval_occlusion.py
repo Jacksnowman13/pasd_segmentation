@@ -58,16 +58,12 @@ def apply_line_occlusion(imgs, band_frac=0.12, value=0.0):
     return out
 
 
-def apply_random_cutout(imgs, cutout_frac=0.20, n_holes=8, value=0.0):
+def apply_random_cutout(imgs, pixel_frac=0.20, n_holes=8, value=0.0):
     b, c, h, w = imgs.shape
-    side = max(1, int(min(h, w) * cutout_frac))
-
     out = imgs.clone()
-    for i in range(b):
-        for _ in range(n_holes):
-            y0 = random.randint(0, max(0, h - side))
-            x0 = random.randint(0, max(0, w - side))
-            out[i, :, y0:y0 + side, x0:x0 + side] = value
+
+    mask = torch.rand(b, 1, h, w, device=imgs.device) < pixel_frac
+    out = out.masked_fill(mask, value)
     return out
 
 
@@ -191,7 +187,7 @@ def main():
     clean_iou, occ_iou, clean_miou, occ_miou, delta = run_occlusion_eval(
         model, loader, device, a.model_type, a.num_classes, a.occ_type, a.severity
     )
-    
+
     print(f"\nClean mIoU={clean_miou:.4f}  Occluded mIoU={occ_miou:.4f}  ΔmIoU={delta:.4f}")
     for c in range(a.num_classes):
         print(f"class {c:02d}: {clean_iou[c].item():.4f}->{occ_iou[c].item():.4f}")
