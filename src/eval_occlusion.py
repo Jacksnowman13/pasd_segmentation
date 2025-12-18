@@ -147,7 +147,7 @@ def run_occlusion_eval(model, loader, device, model_type, num_classes, occ_type,
         elif occ_type == "random":
             cutout_frac = min(0.35, max(0.05, severity))
             n_holes = int(4 + 16 * severity)
-            imgs_occ = apply_random_cutout(imgs, cutout_frac=cutout_frac, n_holes=n_holes, value=0.0)")
+            imgs_occ = apply_random_cutout(imgs, cutout_frac=cutout_frac, n_holes=n_holes, value=0.0)
 
         logits_occ = infer_logits(model, imgs_occ, model_type)
         logits_occ = F.interpolate(logits_occ, size=masks.shape[-2:], mode="bilinear", align_corners=False)
@@ -163,61 +163,55 @@ def run_occlusion_eval(model, loader, device, model_type, num_classes, occ_type,
 
     return clean_iou, occ_iou, clean_miou, occ_miou, delta
 
-
+#AI assisted with argument parsing
 def main():
-    # AI assisted here with argument parsing
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--img_dir", type=str, default=r"..\data\images_val")
-    parser.add_argument("--mask_dir", type=str, default=r"..\data\masks_val")
-    parser.add_argument("--num_classes", type=int, required=True)
-    parser.add_argument("--batch_size", type=int, default=4)
-    parser.add_argument("--model_type", type=str, choices=["segformer", "deeplab", "fair_cnn", "fair_vit"], required=True)
-    parser.add_argument("--ckpt", type=str, required=True)
+    p = argparse.ArgumentParser()
+    p.add_argument("--img_dir", default=r"..\data\images_val")
+    p.add_argument("--mask_dir", default=r"..\data\masks_val")
+    p.add_argument("--num_classes", type=int, required=True)
+    p.add_argument("--batch_size", type=int, default=4)
+    p.add_argument("--model_type", choices=("segformer", "deeplab", "fair_cnn", "fair_vit"), required=True)
+    p.add_argument("--ckpt", required=True)
+    p.add_argument("--occ_type", choices=("box", "line", "random"), default="box")
+    p.add_argument("--severity", type=float, default=0.25)
+    p.add_argument("--seed", type=int, default=123)
+    a = p.parse_args()
 
-    parser.add_argument("--occ_type", type=str, choices=["box", "line", "random"], default="box")
-    parser.add_argument("--severity", type=float, default=0.25, help="fraction controlling occlusion strength (e.g., 0.10 to 0.35)")
-    parser.add_argument("--seed", type=int, default=123)
+    random.seed(a.seed)
+    torch.manual_seed(a.seed)
 
-    args = parser.parse_args()
-
-    random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    #And to help track if it was CUDA 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print("Using device:", device)
-    print("Model:", args.model_type)
-    print("Checkpoint:", args.ckpt)
-    print("Occlusion:", args.occ_type, "severity:", args.severity, "seed:", args.seed)
+    print(f"device={device} model={a.model_type} ckpt={a.ckpt}")
+    print(f"occ={a.occ_type} sev={a.severity} seed={a.seed}")
 
-    loader = get_dataloader(args.img_dir, args.mask_dir, args.batch_size)
-    model = load_model(args.model_type, args.num_classes, args.ckpt, device)
+    loader = get_dataloader(a.img_dir, a.mask_dir, a.batch_size)
+    model = load_model(a.model_type, a.num_classes, a.ckpt, device)
 
     clean_iou, occ_iou, clean_miou, occ_miou, delta = run_occlusion_eval(
-        model, loader, device, args.model_type, args.num_classes, args.occ_type, args.severity
+        model, loader, device, a.model_type, a.num_classes, a.occ_type, a.severity
     )
 
-    print("\n=== Occlusion Results ===")
-    print(f"Clean mIoU:    {clean_miou:.4f}")
-    print(f"Occluded mIoU: {occ_miou:.4f}")
-    print(f"ΔmIoU:         {delta:.4f}")
-
-    print("\nPer-class IoU (clean -> occluded):")
-    for c in range(args.num_classes):
-        print(f"  class {c:02d}: {clean_iou[c].item():.4f} -> {occ_iou[c].item():.4f}")
-    #And this saving, all done with the help of AI 
-    os.makedirs(r"..\eval_outputs", exist_ok=True)
-    out_path = os.path.join(r"..\eval_outputs", f"{args.model_type}_{args.occ_type}_sev{args.severity:.2f}.pt")
-    torch.save({
-        "clean_iou": clean_iou.cpu(),
-        "occ_iou": occ_iou.cpu(),
-        "clean_miou": clean_miou,
-        "occ_miou": occ_miou,
-        "delta_miou": delta,
-        "occ_type": args.occ_type,
-        "severity": args.severity,
-        "seed": args.seed,
-    }, out_path)
-    print(f"\nSaved occlusion results to: {out_path}")
+    print(f"\nClean mIoU={clean_miou:.4f}  Occluded mIoU={occ_miou:.4f}  ΔmIoU={delta:.4f}")
+    for c in range(a.num_classes):
+        print(f"class {c:02d}: {clean_iou[c].item():.4f}->{occ_iou[c].item():.4f}")
+    #AI assisted with saving the output
+    out_dir = r"..\eval_outputs"
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, f"{a.model_type}_{a.occ_type}_sev{a.severity:.2f}.pt")
+    torch.save(
+        {
+            "clean_iou": clean_iou.cpu(),
+            "occ_iou": occ_iou.cpu(),
+            "clean_miou": clean_miou,
+            "occ_miou": occ_miou,
+            "delta_miou": delta,
+            "occ_type": a.occ_type,
+            "severity": a.severity,
+            "seed": a.seed,
+        },
+        out_path,
+    )
+    print("saved:", out_path)
 
 
 if __name__ == "__main__":

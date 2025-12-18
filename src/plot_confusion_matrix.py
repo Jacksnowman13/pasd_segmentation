@@ -99,7 +99,7 @@ def compute_model_confusion(model, val_loader, device, num_classes, model_type):
     hist = compute_confusion_matrix(preds_list, labels_list, num_classes)
     return hist
 
-
+# Also, didn't know how to use sklearn very well, AI helped with this as well
 def plot_cm_sklearn(cm, class_names, title, out_path, values_format=None, figsize=(10, 9)):
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
     fig, ax = plt.subplots(figsize=figsize)
@@ -109,7 +109,6 @@ def plot_cm_sklearn(cm, class_names, title, out_path, values_format=None, figsiz
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     fig.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved: {out_path}")
 
 
 def main():
@@ -136,7 +135,6 @@ def main():
     os.makedirs(figures_dir, exist_ok=True)
 
     base = f"confusion_{args.model_type}"
-
     plot_cm_sklearn(
         cm,
         VOC_CLASS_NAMES,

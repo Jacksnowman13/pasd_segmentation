@@ -2,9 +2,11 @@ import os
 import csv
 import argparse
 import subprocess
+import torch
 from pathlib import Path
 
-# Debugged with the help of ChatGPT
+
+# Debugged with the help of ChatGPT, particularly explaining subprocess usage
 def run_one(model_type, ckpt, occ_type, severity, seed, num_classes, batch_size):
     cmd = [
         "python", "eval_occlusion.py",
@@ -20,15 +22,14 @@ def run_one(model_type, ckpt, occ_type, severity, seed, num_classes, batch_size)
 
 
 def collect_rows(eval_dir, occ_type, severities):
-    import torch
-
     rows = []
     for sev in severities:
         for model_type in ["fair_cnn", "fair_vit"]:
             pt_path = os.path.join(eval_dir, f"{model_type}_{occ_type}_sev{sev:.2f}.pt")
             if not os.path.exists(pt_path):
-                raise FileNotFoundError(f"Missing output: {pt_path} (did eval_occlusion.py save it?)")
+                raise FileNotFoundError(f"Missing output: {pt_path} (did you save it ben?)")
             d = torch.load(pt_path, map_location="cpu")
+            # Formatting here was helped with AI
             rows.append({
                 "model_type": model_type,
                 "occ_type": occ_type,
@@ -42,16 +43,19 @@ def collect_rows(eval_dir, occ_type, severities):
     rows = sorted(rows, key=lambda r: (r["model_type"], r["severity"]))
     return rows
 
-
+# AI assisted with CSV writing
 def write_csv(path, rows):
-    Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)
-    with open(path, "w", newline="") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=["model_type", "occ_type", "severity", "clean_miou", "occ_miou", "delta_miou", "seed"],
-        )
-        writer.writeheader()
-        writer.writerows(rows)
+    d = os.path.dirname(path)
+    Path(d).mkdir(parents=True, exist_ok=True)
+
+    f = open(path, "w", newline="")
+    writer = csv.DictWriter(
+        f,
+        fieldnames=["model_type", "occ_type", "severity", "clean_miou", "occ_miou", "delta_miou", "seed"],
+    )
+    writer.writeheader()
+    writer.writerows(rows)
+    f.close()
 
 # AI assisted with argument parsing and folder creation
 def main():
@@ -78,21 +82,21 @@ def main():
     s = args.start
     while s <= args.end + 1e-9:
         severities.append(round(s, 2))
-        s += args.step
+        s = s + args.step
 
     occ_types = ["box", "line", "random"]
 
+    occ = None
     for occ in occ_types:
+        sev = None
         for sev in severities:
             run_one("fair_cnn", args.ckpt_cnn, occ, sev, args.seed, args.num_classes, args.batch_size)
             run_one("fair_vit", args.ckpt_vit, occ, sev, args.seed, args.num_classes, args.batch_size)
 
     for occ in occ_types:
         rows = collect_rows(args.eval_dir, occ, severities)
-        out_csv = os.path.join(args.out_dir, f"occlusion_sweep_{occ}.csv")
+        out_csv = os.path.join(args.out_dir, "occlusion_sweep_" + occ + ".csv")
         write_csv(out_csv, rows)
-        print(f"\nSaved CSV: {out_csv}")
-
 
 
 if __name__ == "__main__":

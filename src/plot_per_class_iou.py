@@ -45,7 +45,6 @@ def main():
     out_path = os.path.join(r"..\figures", args.out_name)
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
-    print(f"Saved plot to {out_path}")
 
 if __name__ == "__main__":
     main()

@@ -3,12 +3,12 @@ import csv
 import argparse
 import matplotlib.pyplot as plt
 
-
+# Wasn't AI assisted, I figured this one out on my own
 def read_loss_csv(path):
     epochs, losses = [], []
     with open(path, "r") as f:
         reader = csv.reader(f)
-        next(reader, None)  # header
+        next(reader, None)  
         for row in reader:
             if len(row) < 2:
                 continue

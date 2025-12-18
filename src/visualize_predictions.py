@@ -16,13 +16,15 @@ from models_fair import load_fair_cnn, load_fair_vit
 def voc_color_map(num_classes=21):
     cmap = np.zeros((num_classes, 3), dtype=np.uint8)
     for i in range(num_classes):
-        r = g = b = 0
+        r = 0
+        g = 0
+        b = 0
         c = i
         for j in range(8):
             r |= ((c & 1) << (7 - j)); c >>= 1
             g |= ((c & 1) << (7 - j)); c >>= 1
             b |= ((c & 1) << (7 - j)); c >>= 1
-        cmap[i] = np.array([r, g, b])
+        cmap[i] = np.array([r, g, b], dtype=np.uint8)
     return cmap
 
 
@@ -35,6 +37,7 @@ def colorize_mask(mask, cmap):
 
 
 def build_model(model_type, num_classes, checkpoint_path, device):
+    model = None
     if model_type == "segformer":
         model = load_segformer(num_classes)
     elif model_type == "deeplab":
@@ -55,7 +58,7 @@ def build_model(model_type, num_classes, checkpoint_path, device):
 
 @torch.no_grad()
 def forward_logits(model, imgs, masks, model_type):
-    hf_models = ["segformer", "fair_cnn", "fair_vit"]
+    hf_models = ["fair_cnn", "fair_vit"]
 
     if model_type in hf_models:
         logits = model(pixel_values=imgs).logits
@@ -81,7 +84,9 @@ def main():
     parser.add_argument("--num_images", type=int, default=8)
     args = parser.parse_args()
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cpu"
+    if torch.cuda.is_available():
+        device = "cuda"
 
     transform = A.Compose([A.Resize(512, 512)])
     dataset = PASDDataset(args.val_img_dir, args.val_mask_dir, transform=transform)
@@ -91,7 +96,8 @@ def main():
     cmap = voc_color_map(args.num_classes)
 
     out_dir = os.path.join(r"..\outputs", f"{args.model_type}_vis")
-    os.makedirs(out_dir, exist_ok=True)
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
 
     count = 0
     for imgs, masks in loader:
@@ -114,7 +120,7 @@ def main():
         plt.subplot(1, 3, 3); plt.imshow(pred_color); plt.title("Prediction"); plt.axis("off")
         plt.tight_layout()
 
-        out_path = os.path.join(out_dir, f"example_{count:03d}.png")
+        out_path = os.path.join(out_dir, "example_" + str(count).zfill(3) + ".png")
         plt.savefig(out_path, dpi=200, bbox_inches="tight")
         plt.close()
 

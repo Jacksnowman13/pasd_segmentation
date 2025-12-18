@@ -17,13 +17,15 @@ from metrics import _fast_hist
 def voc_color_map(num_classes=21):
     cmap = np.zeros((num_classes, 3), dtype=np.uint8)
     for i in range(num_classes):
-        r = g = b = 0
+        r = 0
+        g = 0
+        b = 0
         c = i
         for j in range(8):
             r |= ((c & 1) << (7 - j)); c >>= 1
             g |= ((c & 1) << (7 - j)); c >>= 1
             b |= ((c & 1) << (7 - j)); c >>= 1
-        cmap[i] = np.array([r, g, b])
+        cmap[i] = np.array([r, g, b], dtype=np.uint8)
     return cmap
 
 
@@ -36,6 +38,7 @@ def colorize_mask(mask, cmap):
 
 
 def build_model(model_type, num_classes, checkpoint_path, device):
+    model = None
     if model_type == "segformer":
         model = load_segformer(num_classes)
     elif model_type == "deeplab":
@@ -56,7 +59,7 @@ def build_model(model_type, num_classes, checkpoint_path, device):
 
 @torch.no_grad()
 def predict_mask(model, img_tensor, mask_tensor, device, model_type):
-    hf_models = ["segformer", "fair_cnn", "fair_vit"]
+    hf_models = ["fair_cnn", "fair_vit"]
 
     imgs = img_tensor.unsqueeze(0).to(device)
     masks = mask_tensor.unsqueeze(0).to(device)
@@ -84,9 +87,11 @@ def compute_image_miou(pred, label, num_classes):
     fp = hist.sum(dim=0) - tp
     fn = hist.sum(dim=1) - tp
     denom = tp + fp + fn
+
     valid_classes = denom > 0
     if not valid_classes.any():
         return 0.0
+
     iou = torch.zeros_like(tp)
     iou[valid_classes] = tp[valid_classes] / denom[valid_classes]
     return float(iou[valid_classes].mean().item())
@@ -121,7 +126,9 @@ def main():
     parser.add_argument("--bottom_k", type=int, default=4)
     args = parser.parse_args()
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cpu"
+    if torch.cuda.is_available():
+        device = "cuda"
 
     transform = A.Compose([A.Resize(512, 512)])
     val_ds = PASDDataset(args.val_img_dir, args.val_mask_dir, transform=transform)
@@ -129,36 +136,38 @@ def main():
     model = build_model(args.model_type, args.num_classes, args.checkpoint, device)
     cmap = voc_color_map(num_classes=args.num_classes)
 
-    # compute per-image mIoU
     scores = []
-    for idx in range(len(val_ds)):
-        img_tensor, mask_tensor = val_ds[idx]
+    i = 0
+    n = len(val_ds)
+    while i < n:
+        img_tensor, mask_tensor = val_ds[i]
         preds = predict_mask(model, img_tensor, mask_tensor, device, args.model_type)
         miou = compute_image_miou(preds, mask_tensor.cpu(), args.num_classes)
-        scores.append((idx, miou))
+        scores.append((i, miou))
+        i += 1
 
     scores.sort(key=lambda x: x[1])
     bottom = scores[:args.bottom_k]
     top = scores[-args.top_k:]
 
-    print(f"Lowest {args.bottom_k} mIoU samples:", bottom)
-    print(f"Highest {args.top_k} mIoU samples:", top)
-
     out_root = os.path.join("..", "outputs", f"{args.model_type}_best_worst")
 
-    # Worst
-    for rank, (idx, miou) in enumerate(bottom):
+    rank = 0
+    for idx, miou in bottom:
         img_tensor, mask_tensor = val_ds[idx]
         preds = predict_mask(model, img_tensor, mask_tensor, device, args.model_type)
         out_path = os.path.join(out_root, f"worst_{rank}_idx{idx}_miou{miou:.3f}.png")
         save_triptych(img_tensor, mask_tensor, preds, cmap, out_path, title=f"Worst {rank} (idx={idx}, mIoU={miou:.3f})")
+        rank += 1
 
-    # Best
-    for rank, (idx, miou) in enumerate(reversed(top)):
+    rank = 0
+    top = list(reversed(top))
+    for idx, miou in top:
         img_tensor, mask_tensor = val_ds[idx]
         preds = predict_mask(model, img_tensor, mask_tensor, device, args.model_type)
         out_path = os.path.join(out_root, f"best_{rank}_idx{idx}_miou{miou:.3f}.png")
         save_triptych(img_tensor, mask_tensor, preds, cmap, out_path, title=f"Best {rank} (idx={idx}, mIoU={miou:.3f})")
+        rank += 1
 
 
 if __name__ == "__main__":

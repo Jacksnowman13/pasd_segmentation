@@ -81,6 +81,7 @@ def train_one_epoch(model, train_loader, optimizer, device, model_type, num_clas
 
     return total_loss / len(train_loader)
 
+
 # AI assisted here with argument parsing and folder creation
 def main():
     parser = argparse.ArgumentParser()
@@ -94,19 +95,22 @@ def main():
     parser.add_argument("--lr", type=float, default=5e-5)
     parser.add_argument(
         "--model_type",
-        type=str,
+        type=str, #Legacy code from my previous iterations of this project
         choices=["segformer", "deeplab", "fair_cnn", "fair_vit"],
         default="segformer",
     )
     parser.add_argument("--save_path", type=str, default=r"..\checkpoints")
     args = parser.parse_args()
 
-    os.makedirs(args.save_path, exist_ok=True)
-    os.makedirs(r"..\logs", exist_ok=True)
+    if not os.path.exists(args.save_path):
+        os.makedirs(args.save_path, exist_ok=True)
+    if not os.path.exists(r"..\logs"):
+        os.makedirs(r"..\logs", exist_ok=True)
 
     log_path = os.path.join(r"..\logs", f"{args.model_type}_loss.csv")
-    with open(log_path, "w") as f:
-        f.write("epoch,loss\n")
+    f = open(log_path, "w")
+    f.write("epoch,loss\n")
+    f.close()
 
     train_loader, _ = get_dataloaders(
         args.train_img_dir,
@@ -116,6 +120,8 @@ def main():
         args.batch_size,
     )
 
+    model = None
+    optimizer = None
     if args.model_type == "segformer":
         model = load_segformer(args.num_classes)
         optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
@@ -131,14 +137,17 @@ def main():
     else:
         raise ValueError(f"Unknown model_type: {args.model_type}")
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cpu"
+    if torch.cuda.is_available():
+        device = "cuda"
     #Debug to make sure we are using cuda
     print("Using device:", device)
     model.to(device)
 
     best_loss = float("inf")
 
-    for epoch in range(args.epochs):
+    epoch = 0
+    while epoch < args.epochs:
         train_loss = train_one_epoch(
             model,
             train_loader,
@@ -150,14 +159,17 @@ def main():
 
         print(f"Epoch {epoch+1}/{args.epochs} - train loss: {train_loss:.4f}")
 
-        with open(log_path, "a") as f:
-            f.write(f"{epoch+1},{train_loss}\n")
+        f = open(log_path, "a")
+        f.write(f"{epoch+1},{train_loss}\n")
+        f.close()
 
         if train_loss < best_loss:
             best_loss = train_loss
             ckpt = os.path.join(args.save_path, f"{args.model_type}_best.pt")
             print(f"Saving new best model to {ckpt}")
             torch.save(model.state_dict(), ckpt)
+
+        epoch += 1
 
 
 if __name__ == "__main__":

@@ -111,38 +111,26 @@ def run_eval(model, loader, device, model_type, num_classes):
 
 
 def main():
-    # Technically AI Assisted since I took the help from eval_occlusion and used it here.
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--img_dir", type=str, default=r"..\data\images_val")
-    parser.add_argument("--mask_dir", type=str, default=r"..\data\masks_val")
-    parser.add_argument("--num_classes", type=int, required=True)
-    parser.add_argument("--batch_size", type=int, default=4)
-    parser.add_argument("--model_type", type=str, choices=["segformer", "deeplab", "fair_cnn", "fair_vit"], required=True)
-    parser.add_argument("--ckpt", type=str, required=True)
-    args = parser.parse_args()
+    # AI help: adapted parts from eval_occlusion into this eval script.
+    p = argparse.ArgumentParser()
+    p.add_argument("--img_dir", default=r"..\data\images_val")
+    p.add_argument("--mask_dir", default=r"..\data\masks_val")
+    p.add_argument("--num_classes", type=int, required=True)
+    p.add_argument("--batch_size", type=int, default=4)
+    p.add_argument("--model_type", choices=("segformer", "deeplab", "fair_cnn", "fair_vit"), required=True)
+    p.add_argument("--ckpt", required=True)
+    a = p.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print("Using device:", device)
-    print("Model:", args.model_type)
-    print("Checkpoint:", args.ckpt)
 
-    loader = get_dataloader(args.img_dir, args.mask_dir, args.batch_size)
-    model = load_model(args.model_type, args.num_classes, args.ckpt, device)
+    loader = get_dataloader(a.img_dir, a.mask_dir, a.batch_size)
+    model = load_model(a.model_type, a.num_classes, a.ckpt, device)
 
-    conf_mat, iou, miou, pacc = run_eval(model, loader, device, args.model_type, args.num_classes)
-
-    print("\n=== Results ===")
-    print(f"mIoU: {miou:.4f}")
-    print(f"Pixel Acc: {pacc:.4f}")
-
-    print("\nPer-class IoU:")
-    for c in range(args.num_classes):
-        print(f"  class {c:02d}: {iou[c].item():.4f}")
+    conf_mat, iou, miou, pacc = run_eval(model, loader, device, a.model_type, a.num_classes)
 
     os.makedirs(r"..\eval_outputs", exist_ok=True)
-    out_path = os.path.join(r"..\eval_outputs", f"{args.model_type}_confmat.pt")
+    out_path = os.path.join(r"..\eval_outputs", a.model_type + "_confmat.pt")
     torch.save(conf_mat, out_path)
-    print(f"\nSaved confusion matrix to: {out_path}")
 
 
 if __name__ == "__main__":

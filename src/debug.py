@@ -5,7 +5,7 @@ from dataset import PASDDataset
 
 # AI helped with debugging, making sure we had the right number of labels
 transform = A.Compose([A.Resize(512, 512)])
-val_ds = PASDDataset(r"..\data\images_val", r"..\data\masks_val", transform=transform)
+val_ds = PASDDataset(r"..\data\images_val", r"..\data\masks_val", transform=transform) #Particularly with this line
 label_counts = Counter()
 for _, mask in val_ds:
     unique, counts = torch.unique(mask, return_counts=True)

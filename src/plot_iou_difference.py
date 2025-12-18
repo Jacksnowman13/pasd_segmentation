@@ -37,7 +37,7 @@ def main():
     plt.bar(x, diff)
     plt.xticks(x, VOC_CLASS_NAMES, rotation=45, ha="right")
     plt.ylabel(f"ΔIoU ({args.label_cmp} − {args.label_ref})")
-    plt.title(f"Per-class IoU difference (mIoU: {args.label_cmp}={miou_cmp:.3f}, {args.label_ref}={miou_ref:.3f})")
+    plt.title(f"Per-class IoU difference (mIoU: {args.label_cmp}={miou_cmp}, {args.label_ref}={miou_ref})")
     plt.tight_layout()
 
     os.makedirs(r"..\figures", exist_ok=True)

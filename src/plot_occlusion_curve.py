@@ -3,7 +3,7 @@ import csv
 import argparse
 import matplotlib.pyplot as plt
 
-
+# AI asisted wtih helping read CSV files
 def read_csv(path):
     rows = []
     with open(path, "r", newline="") as f:
@@ -56,7 +56,7 @@ def main():
     args = parser.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)
-
+    # AI Assisted here
     if args.mode == "single":
         if args.csv is None:
             raise ValueError("Issues")

@@ -68,8 +68,8 @@ def main():
         model, val_loader, device, args.num_classes, args.model_type
     )
 
-    print(f"Mean IoU: {miou:.4f}")
-    print(f"Pixel accuracy: {pixel_acc:.4f}")
+    print(f"Mean IoU: {miou}")
+    print(f"Pixel accuracy: {pixel_acc}")
     print("Per-class IoU:", iou_per_class.tolist())
 
 
