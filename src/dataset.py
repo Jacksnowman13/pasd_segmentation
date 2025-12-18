@@ -11,7 +11,6 @@ class PASDDataset(Dataset):
         self.mask_dir = mask_dir
         self.transform = transform
 
-        # AI assisted here 
         self.image_files = sorted([
             f for f in os.listdir(img_dir)
             if f.lower().endswith((".jpg", ".jpeg", ".png"))
@@ -21,7 +20,6 @@ class PASDDataset(Dataset):
             if f.lower().endswith((".png",)) 
         ])
         assert len(self.image_files) == len(self.mask_files), "Checks for image/mask count are same" 
-        # Ends here 
 
     def __len__(self):
         return len(self.image_files)
