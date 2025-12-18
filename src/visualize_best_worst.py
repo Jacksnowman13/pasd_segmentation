@@ -1,5 +1,5 @@
 import os
-import argparse
+import sys
 
 import numpy as np
 import torch
@@ -8,8 +8,6 @@ import matplotlib.pyplot as plt
 import albumentations as A
 
 from dataset import PASDDataset
-from models_segformer import load_segformer
-from models_deeplab import load_deeplab
 from models_fair import load_fair_cnn, load_fair_vit
 from metrics import _fast_hist
 
@@ -17,9 +15,7 @@ from metrics import _fast_hist
 def voc_color_map(num_classes=21):
     cmap = np.zeros((num_classes, 3), dtype=np.uint8)
     for i in range(num_classes):
-        r = 0
-        g = 0
-        b = 0
+        r = g = b = 0
         c = i
         for j in range(8):
             r |= ((c & 1) << (7 - j)); c >>= 1
@@ -35,43 +31,6 @@ def colorize_mask(mask, cmap):
     valid = (mask >= 0) & (mask < cmap.shape[0])
     color[valid] = cmap[mask[valid]]
     return color
-
-
-def build_model(model_type, num_classes, checkpoint_path, device):
-    model = None
-    if model_type == "segformer":
-        model = load_segformer(num_classes)
-    elif model_type == "deeplab":
-        model = load_deeplab(num_classes)
-    elif model_type == "fair_cnn":
-        model = load_fair_cnn(num_classes)
-    elif model_type == "fair_vit":
-        model = load_fair_vit(num_classes)
-    else:
-        raise ValueError(f"Unknown model_type: {model_type}")
-
-    state_dict = torch.load(checkpoint_path, map_location="cpu")
-    model.load_state_dict(state_dict)
-    model.to(device)
-    model.eval()
-    return model
-
-
-@torch.no_grad()
-def predict_mask(model, img_tensor, mask_tensor, device, model_type):
-    hf_models = ["fair_cnn", "fair_vit"]
-
-    imgs = img_tensor.unsqueeze(0).to(device)
-    masks = mask_tensor.unsqueeze(0).to(device)
-
-    if model_type in hf_models:
-        logits = model(pixel_values=imgs).logits
-    else:
-        logits = model(imgs)["out"]
-
-    logits = F.interpolate(logits, size=masks.shape[-2:], mode="bilinear", align_corners=False)
-    preds = torch.argmax(logits, dim=1)[0].cpu()
-    return preds
 
 
 def compute_image_miou(pred, label, num_classes):
@@ -103,9 +62,12 @@ def save_triptych(img_tensor, gt_mask, pred_mask, cmap, out_path, title=None):
     pred_color = colorize_mask(pred_mask.numpy(), cmap)
 
     plt.figure(figsize=(9, 3))
-    plt.subplot(1, 3, 1); plt.imshow(img); plt.axis("off"); plt.title("Image")
-    plt.subplot(1, 3, 2); plt.imshow(gt_color); plt.axis("off"); plt.title("Ground truth")
-    plt.subplot(1, 3, 3); plt.imshow(pred_color); plt.axis("off"); plt.title("Prediction")
+    plt.subplot(1, 3, 1); plt.imshow(img) 
+    plt.axis("off"); plt.title("Image")
+    plt.subplot(1, 3, 2); plt.imshow(gt_color)
+    plt.axis("off"); plt.title("Ground truth")
+    plt.subplot(1, 3, 3); plt.imshow(pred_color)
+    plt.axis("off"); plt.title("Prediction")
 
     if title:
         plt.suptitle(title)
@@ -116,58 +78,92 @@ def save_triptych(img_tensor, gt_mask, pred_mask, cmap, out_path, title=None):
 
 # AI assisted
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--val_img_dir", type=str, default=r"..\data\images_val")
-    parser.add_argument("--val_mask_dir", type=str, default=r"..\data\masks_val")
-    parser.add_argument("--num_classes", type=int, default=21)
-    parser.add_argument("--model_type", type=str, choices=["segformer", "deeplab", "fair_cnn", "fair_vit"], required=True)
-    parser.add_argument("--checkpoint", type=str, required=True)
-    parser.add_argument("--top_k", type=int, default=4)
-    parser.add_argument("--bottom_k", type=int, default=4)
-    args = parser.parse_args()
+    val_img_dir = sys.argv[1]
+    val_mask_dir = sys.argv[2]
+    num_classes = int(sys.argv[3])
+    model_type = sys.argv[4]
+    checkpoint = sys.argv[5]
+    top_k = int(sys.argv[6])
+    bottom_k = int(sys.argv[7])
 
-    device = "cpu"
-    if torch.cuda.is_available():
-        device = "cuda"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    transform = A.Compose([A.Resize(512, 512)])
-    val_ds = PASDDataset(args.val_img_dir, args.val_mask_dir, transform=transform)
+    tfm = A.Compose([A.Resize(512, 512)])
+    val_ds = PASDDataset(val_img_dir, val_mask_dir, transform=tfm)
 
-    model = build_model(args.model_type, args.num_classes, args.checkpoint, device)
-    cmap = voc_color_map(num_classes=args.num_classes)
+    if model_type == "fair_cnn":
+        model = load_fair_cnn(num_classes)
+    else:
+        model = load_fair_vit(num_classes)  
+
+    model.load_state_dict(torch.load(checkpoint, map_location="cpu"))
+    model.to(device)
+    model.eval()
+
+    cmap = voc_color_map(num_classes)
 
     scores = []
-    i = 0
-    n = len(val_ds)
-    while i < n:
+    for i in range(len(val_ds)):
         img_tensor, mask_tensor = val_ds[i]
-        preds = predict_mask(model, img_tensor, mask_tensor, device, args.model_type)
-        miou = compute_image_miou(preds, mask_tensor.cpu(), args.num_classes)
+
+        imgs = img_tensor.unsqueeze(0).to(device)
+        masks = mask_tensor.unsqueeze(0).to(device)
+
+        with torch.no_grad():
+            if model_type == "fair_cnn" or model_type == "fair_vit":
+                logits = model(pixel_values=imgs).logits
+            else:
+                logits = model(imgs)["out"]
+
+            logits = F.interpolate(logits, size=masks.shape[-2:], mode="bilinear", align_corners=False)
+            preds = torch.argmax(logits, dim=1)[0].cpu()
+
+        miou = compute_image_miou(preds, mask_tensor.cpu(), num_classes)
         scores.append((i, miou))
-        i += 1
 
     scores.sort(key=lambda x: x[1])
-    bottom = scores[:args.bottom_k]
-    top = scores[-args.top_k:]
+    bottom = scores[:bottom_k]
+    top = scores[-top_k:]  # highest miou at end
 
-    out_root = os.path.join("..", "outputs", f"{args.model_type}_best_worst")
+    out_root = os.path.join("..", "outputs", f"{model_type}_best_worst")
 
-    rank = 0
-    for idx, miou in bottom:
+    # worst
+    for rank, (idx, miou) in enumerate(bottom):
         img_tensor, mask_tensor = val_ds[idx]
-        preds = predict_mask(model, img_tensor, mask_tensor, device, args.model_type)
+
+        imgs = img_tensor.unsqueeze(0).to(device)
+        masks = mask_tensor.unsqueeze(0).to(device)
+
+        with torch.no_grad():
+            if model_type == "fair_cnn" or model_type == "fair_vit":
+                logits = model(pixel_values=imgs).logits
+            else:
+                logits = model(imgs)["out"]
+            logits = F.interpolate(logits, size=masks.shape[-2:], mode="bilinear", align_corners=False)
+            preds = torch.argmax(logits, dim=1)[0].cpu()
+
         out_path = os.path.join(out_root, f"worst_{rank}_idx{idx}_miou{miou:.3f}.png")
-        save_triptych(img_tensor, mask_tensor, preds, cmap, out_path, title=f"Worst {rank} (idx={idx}, mIoU={miou})")
-        rank += 1
+        save_triptych(img_tensor, mask_tensor, preds, cmap, out_path,
+                      title=f"Worst {rank} (idx={idx}, mIoU={miou})")
 
-    rank = 0
     top = list(reversed(top))
-    for idx, miou in top:
+    for rank, (idx, miou) in enumerate(top):
         img_tensor, mask_tensor = val_ds[idx]
-        preds = predict_mask(model, img_tensor, mask_tensor, device, args.model_type)
+
+        imgs = img_tensor.unsqueeze(0).to(device)
+        masks = mask_tensor.unsqueeze(0).to(device)
+
+        with torch.no_grad():
+            if model_type == "fair_cnn" or model_type == "fair_vit":
+                logits = model(pixel_values=imgs).logits
+            else:
+                logits = model(imgs)["out"]
+            logits = F.interpolate(logits, size=masks.shape[-2:], mode="bilinear", align_corners=False)
+            preds = torch.argmax(logits, dim=1)[0].cpu()
+
         out_path = os.path.join(out_root, f"best_{rank}_idx{idx}_miou{miou:.3f}.png")
-        save_triptych(img_tensor, mask_tensor, preds, cmap, out_path, title=f"Best {rank} (idx={idx}, mIoU={miou})")
-        rank += 1
+        save_triptych(img_tensor, mask_tensor, preds, cmap, out_path,
+                      title=f"Best {rank} (idx={idx}, mIoU={miou})")
 
 
 if __name__ == "__main__":

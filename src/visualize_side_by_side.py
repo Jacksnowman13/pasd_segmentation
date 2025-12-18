@@ -1,5 +1,5 @@
 import os
-import argparse
+import sys
 import random
 
 import numpy as np
@@ -13,137 +13,114 @@ from models_segformer import load_segformer
 from models_deeplab import load_deeplab
 from models_fair import load_fair_cnn, load_fair_vit
 
+
 def voc_color_map(num_classes=21):
     cmap = np.zeros((num_classes, 3), dtype=np.uint8)
-
     for i in range(num_classes):
-        r = 0
-        g = 0
-        b = 0
+        r = g = b = 0
         c = i
         for j in range(8):
             r |= ((c & 1) << (7 - j)); c >>= 1
             g |= ((c & 1) << (7 - j)); c >>= 1
             b |= ((c & 1) << (7 - j)); c >>= 1
-        cmap[i] = np.array([r, g, b], dtype=np.uint8)
-
+        cmap[i] = [r, g, b]
     return cmap
 
 
 def colorize_mask(mask, cmap):
-    h, w = mask.shape
-    out = np.zeros((h, w, 3), dtype=np.uint8)
+    out = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
     ok = (mask >= 0) & (mask < cmap.shape[0])
     out[ok] = cmap[mask[ok]]
     return out
 
-
-def build_model(model_type, num_classes, checkpoint_path, device):
-    m = None
-    if model_type == "segformer":
-        m = load_segformer(num_classes)
-    elif model_type == "deeplab":
-        m = load_deeplab(num_classes)
-    elif model_type == "fair_cnn":
-        m = load_fair_cnn(num_classes)
-    elif model_type == "fair_vit":
-        m = load_fair_vit(num_classes)
-    else:
-        raise ValueError(f"Unknown model_type: {model_type}")
-
-    sd = torch.load(checkpoint_path, map_location="cpu")
-    m.load_state_dict(sd)
-    m.to(device)
-    m.eval()
-    return m
-
-
-@torch.no_grad()
-def run_model(model, imgs, masks, model_type):
-    hf_models = ["fair_cnn", "fair_vit"]
-
-    if model_type in hf_models:
-        logits = model(pixel_values=imgs).logits
-    else:
-        logits = model(imgs)["out"]
-
-    logits = F.interpolate(logits, size=masks.shape[-2:], mode="bilinear", align_corners=False)
-    preds = torch.argmax(logits, dim=1)
-    return preds
-
-
-def save_side_by_side(img_tensor, gt_mask, pred_a, pred_b, cmap, out_path, label_a="Model A", label_b="Model B"):
-    img = img_tensor.numpy()
-    img = img.transpose(1, 2, 0)
-
-    gt_color = colorize_mask(gt_mask.numpy(), cmap)
-    a_color = colorize_mask(pred_a.numpy(), cmap)
-    b_color = colorize_mask(pred_b.numpy(), cmap)
-
-    plt.figure(figsize=(11, 3))
-    plt.subplot(1, 4, 1); plt.imshow(img);      plt.axis("off"); plt.title("Image")
-    plt.subplot(1, 4, 2); plt.imshow(gt_color); plt.axis("off"); plt.title("Ground Truth")
-    plt.subplot(1, 4, 3); plt.imshow(a_color);  plt.axis("off"); plt.title(label_a)
-    plt.subplot(1, 4, 4); plt.imshow(b_color);  plt.axis("off"); plt.title(label_b)
-
-    d = os.path.dirname(out_path)
-    os.makedirs(d, exist_ok=True)
-    plt.savefig(out_path, dpi=200, bbox_inches="tight")
-    plt.close()
-
-
+#AI assisted
 def main():
-    # AI assisted 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--val_img_dir", type=str, default=r"..\data\images_val")
-    parser.add_argument("--val_mask_dir", type=str, default=r"..\data\masks_val")
-    parser.add_argument("--num_classes", type=int, default=21)
+    VAL_IMG_DIR  = sys.argv[1]
+    VAL_MASK_DIR = sys.argv[2]
+    NUM_CLASSES  = int(sys.argv[3])
 
-    parser.add_argument("--model_a_type", type=str, choices=["segformer", "deeplab", "fair_cnn", "fair_vit"], required=True)
-    parser.add_argument("--model_a_ckpt", type=str, required=True)
-    parser.add_argument("--label_a", type=str, default="Model A")
+    MODEL_A_TYPE = sys.argv[4]
+    MODEL_A_CKPT = sys.argv[5]
+    LABEL_A      = sys.argv[6]
 
-    parser.add_argument("--model_b_type", type=str, choices=["segformer", "deeplab", "fair_cnn", "fair_vit"], required=True)
-    parser.add_argument("--model_b_ckpt", type=str, required=True)
-    parser.add_argument("--label_b", type=str, default="Model B")
+    MODEL_B_TYPE = sys.argv[7]
+    MODEL_B_CKPT = sys.argv[8]
+    LABEL_B      = sys.argv[9]
 
-    parser.add_argument("--num_examples", type=int, default=6)
-    parser.add_argument("--seed", type=int, default=42)
-    args = parser.parse_args()
+    NUM_EXAMPLES = int(sys.argv[10])
+    SEED         = int(sys.argv[11])
 
-    device = "cpu"
-    if torch.cuda.is_available():
-        device = "cuda"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    transform = A.Compose([A.Resize(512, 512)])
-    ds = PASDDataset(args.val_img_dir, args.val_mask_dir, transform=transform)
+    ds = PASDDataset(VAL_IMG_DIR, VAL_MASK_DIR, transform=A.Compose([A.Resize(512, 512)]))
 
-    mA = build_model(args.model_a_type, args.num_classes, args.model_a_ckpt, device)
-    mB = build_model(args.model_b_type, args.num_classes, args.model_b_ckpt, device)
+    if MODEL_A_TYPE == "fair_cnn":
+        mA = load_fair_cnn(NUM_CLASSES)
+    else:
+        mA = load_fair_vit(NUM_CLASSES)
 
-    random.seed(args.seed)
-    n = len(ds)
-    k = args.num_examples
-    if k > n:
-        k = n
-    idxs = random.sample(range(n), k=k)
+    mA.load_state_dict(torch.load(MODEL_A_CKPT, map_location="cpu"))
+    mA.to(device)
+    mA.eval()
 
-    cmap = voc_color_map(num_classes=args.num_classes)
-    out_root = os.path.join("..", "outputs", "side_by_side", f"{args.model_a_type}_vs_{args.model_b_type}")
+    if MODEL_B_TYPE == "fair_cnn":
+        mB = load_fair_cnn(NUM_CLASSES)
+    else:
+        mB = load_fair_vit(NUM_CLASSES)
 
-    r = 0
-    for idx in idxs:
+    mB.load_state_dict(torch.load(MODEL_B_CKPT, map_location="cpu"))
+    mB.to(device)
+    mB.eval()
+
+    cmap = voc_color_map(NUM_CLASSES)
+
+    random.seed(SEED)
+    k = min(NUM_EXAMPLES, len(ds))
+    idxs = random.sample(range(len(ds)), k)
+
+    out_root = os.path.join("..", "outputs", "side_by_side", f"{MODEL_A_TYPE}_vs_{MODEL_B_TYPE}")
+    os.makedirs(out_root, exist_ok=True)
+
+    for r, idx in enumerate(idxs):
         img_t, mask_t = ds[idx]
-
         imgs = img_t.unsqueeze(0).to(device)
         masks = mask_t.unsqueeze(0).to(device)
 
-        pa = run_model(mA, imgs, masks, args.model_a_type)[0].cpu()
-        pb = run_model(mB, imgs, masks, args.model_b_type)[0].cpu()
+        with torch.no_grad():
+            if MODEL_A_TYPE == "fair_cnn" or MODEL_A_TYPE == "fair_vit":
+                logitsA = mA(pixel_values=imgs).logits
+            else:
+                logitsA = mA(imgs)["out"]
+
+            if MODEL_B_TYPE == "fair_cnn" or MODEL_B_TYPE == "fair_vit":
+                logitsB = mB(pixel_values=imgs).logits
+            else:
+                logitsB = mB(imgs)["out"]
+
+            logitsA = F.interpolate(logitsA, size=masks.shape[-2:], mode="bilinear", align_corners=False)
+            logitsB = F.interpolate(logitsB, size=masks.shape[-2:], mode="bilinear", align_corners=False)
+
+            pa = torch.argmax(logitsA, dim=1)[0].cpu()
+            pb = torch.argmax(logitsB, dim=1)[0].cpu()
+
+        img = img_t.numpy().transpose(1, 2, 0)
+        gt_color = colorize_mask(mask_t.numpy(), cmap)
+        a_color  = colorize_mask(pa.numpy(), cmap)
+        b_color  = colorize_mask(pb.numpy(), cmap)
+
+        plt.figure(figsize=(11, 3))
+        plt.subplot(1, 4, 1); plt.imshow(img)
+        plt.axis("off"); plt.title("Image")
+        plt.subplot(1, 4, 2); plt.imshow(gt_color)
+        plt.axis("off"); plt.title("Ground Truth")
+        plt.subplot(1, 4, 3); plt.imshow(a_color)
+        plt.axis("off"); plt.title(LABEL_A)
+        plt.subplot(1, 4, 4); plt.imshow(b_color)
+        plt.axis("off"); plt.title(LABEL_B)
 
         out_path = os.path.join(out_root, f"example_{r}_idx{idx}.png")
-        save_side_by_side(img_t, mask_t, pa, pb, cmap, out_path, args.label_a, args.label_b)
-        r += 1
+        plt.savefig(out_path, dpi=200, bbox_inches="tight")
+        plt.close()
 
 
 if __name__ == "__main__":

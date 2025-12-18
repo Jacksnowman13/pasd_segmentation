@@ -1,15 +1,13 @@
 import os
 import csv
-import argparse
-import subprocess
+import sys
+import runpy
 import torch
-from pathlib import Path
 
 
-# Debugged with the help of ChatGPT
-def run_one(model_type, ckpt, occ_type, severity, seed, num_classes, batch_size):
-    cmd = [
-        "python", "eval_occlusion.py",
+def run_eval_occlusion(num_classes, batch_size, seed, model_type, ckpt, occ_type, severity):
+    sys.argv = [
+        "eval_occlusion.py",
         "--num_classes", str(num_classes),
         "--batch_size", str(batch_size),
         "--model_type", model_type,
@@ -18,85 +16,72 @@ def run_one(model_type, ckpt, occ_type, severity, seed, num_classes, batch_size)
         "--severity", f"{severity:.2f}",
         "--seed", str(seed),
     ]
-    subprocess.run(cmd, check=True)
+    runpy.run_path("eval_occlusion.py", run_name="__main__")
 
 
-def collect_rows(eval_dir, occ_type, severities):
-    rows = []
-    for sev in severities:
-        for model_type in ["fair_cnn", "fair_vit"]:
-            pt_path = os.path.join(eval_dir, f"{model_type}_{occ_type}_sev{sev:.2f}.pt")
-            if not os.path.exists(pt_path):
-                raise FileNotFoundError(f"Missing output: {pt_path} (did you save it ben?)")
-            d = torch.load(pt_path, map_location="cpu")
-            # Formatting here was helped with AI
-            rows.append({
-                "model_type": model_type,
-                "occ_type": occ_type,
-                "severity": float(sev),
-                "clean_miou": float(d["clean_miou"]),
-                "occ_miou": float(d["occ_miou"]),
-                "delta_miou": float(d["delta_miou"]),
-                "seed": int(d.get("seed", -1)),
-            })
-
-    rows = sorted(rows, key=lambda r: (r["model_type"], r["severity"]))
-    return rows
-
-# AI assisted with CSV writing
-def write_csv(path, rows):
-    d = os.path.dirname(path)
-    Path(d).mkdir(parents=True, exist_ok=True)
-
-    f = open(path, "w", newline="")
-    writer = csv.DictWriter(
-        f,
-        fieldnames=["model_type", "occ_type", "severity", "clean_miou", "occ_miou", "delta_miou", "seed"],
-    )
-    writer.writeheader()
-    writer.writerows(rows)
-    f.close()
-
-# AI assisted with argument parsing and folder creation
+# AI assisted
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--num_classes", type=int, default=21)
-    parser.add_argument("--batch_size", type=int, default=4)
-    parser.add_argument("--seed", type=int, default=123)
+    num_classes = int(sys.argv[1])
+    batch_size = int(sys.argv[2])
+    seed = int(sys.argv[3])
+    ckpt_cnn = sys.argv[4]
+    ckpt_vit = sys.argv[5]
+    eval_dir = sys.argv[6]
+    out_dir = sys.argv[7]
+    start = float(sys.argv[8])
+    end = float(sys.argv[9])
+    step = float(sys.argv[10])
 
-    parser.add_argument("--start", type=float, default=0.05)
-    parser.add_argument("--end", type=float, default=0.35)
-    parser.add_argument("--step", type=float, default=0.05)
-
-    parser.add_argument("--ckpt_cnn", type=str, default=r"..\checkpoints\fair_cnn_best.pt")
-    parser.add_argument("--ckpt_vit", type=str, default=r"..\checkpoints\fair_vit_best.pt")
-
-    parser.add_argument("--eval_dir", type=str, default=r"..\eval_outputs")
-    parser.add_argument("--out_dir", type=str, default=r"..\eval_outputs")
-    args = parser.parse_args()
-
-    Path(args.eval_dir).mkdir(parents=True, exist_ok=True)
-    Path(args.out_dir).mkdir(parents=True, exist_ok=True)
-
-    severities = []
-    s = args.start
-    while s <= args.end + 1e-9:
-        severities.append(round(s, 2))
-        s = s + args.step
+    os.makedirs(eval_dir, exist_ok=True)
+    os.makedirs(out_dir, exist_ok=True)
 
     occ_types = ["box", "line", "random"]
+    models = [("fair_cnn", ckpt_cnn), ("fair_vit", ckpt_vit)]
 
-    occ = None
+    severities = []
+    s = start
+    while s <= end + 1e-9:
+        severities.append(round(s, 2))
+        s += step
+
     for occ in occ_types:
-        sev = None
         for sev in severities:
-            run_one("fair_cnn", args.ckpt_cnn, occ, sev, args.seed, args.num_classes, args.batch_size)
-            run_one("fair_vit", args.ckpt_vit, occ, sev, args.seed, args.num_classes, args.batch_size)
+            for model_type, ckpt in models:
+                print("running:", model_type, occ, sev)
+                try:
+                    run_eval_occlusion(num_classes, batch_size, seed, model_type, ckpt, occ, sev)
+                except Exception:
+                    print("FAILED")
+
+    fields = ["model_type", "occ_type", "severity", "clean_miou", "occ_miou", "delta_miou", "seed"]
 
     for occ in occ_types:
-        rows = collect_rows(args.eval_dir, occ, severities)
-        out_csv = os.path.join(args.out_dir, "occlusion_sweep_" + occ + ".csv")
-        write_csv(out_csv, rows)
+        rows = []
+        for sev in severities:
+            for model_type, _ in models:
+                pt_path = os.path.join(eval_dir, f"{model_type}_{occ}_sev{sev:.2f}.pt")
+                if not os.path.exists(pt_path):
+                    print("missing:", pt_path)
+                    continue
+                d = torch.load(pt_path, map_location="cpu")
+                rows.append({
+                    "model_type": model_type,
+                    "occ_type": occ,
+                    "severity": float(sev),
+                    "clean_miou": float(d["clean_miou"]),
+                    "occ_miou": float(d["occ_miou"]),
+                    "delta_miou": float(d["delta_miou"]),
+                    "seed": int(d.get("seed", -1)),
+                })
+
+        rows.sort(key=lambda r: (r["model_type"], r["severity"]))
+
+        out_csv = os.path.join(out_dir, f"occlusion_sweep_{occ}.csv")
+        f = open(out_csv, "w", newline="")
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        w.writerows(rows)
+        f.close()
 
 
 if __name__ == "__main__":

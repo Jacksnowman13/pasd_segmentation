@@ -1,46 +1,44 @@
 import os
 import csv
-import argparse
+import sys
 import matplotlib.pyplot as plt
 
+
 def read_loss_csv(path):
-    epochs, losses = [], []
-    with open(path, "r") as f:
-        reader = csv.reader(f)
-        next(reader, None)  
-        for row in reader:
-            if len(row) < 2:
-                continue
-            epochs.append(int(row[0]))
-            losses.append(float(row[1]))
-    return epochs, losses
+    e, l = [], []
+    f = open(path, "r")
+    r = csv.reader(f)
+    next(r, None)
+    for row in r:
+        if len(row) >= 2:
+            e.append(int(row[0]))
+            l.append(float(row[1]))
+    f.close()
+    return e, l
 
 
-def try_plot(logs_dir, model_type, label=None):
-    path = os.path.join(logs_dir, f"{model_type}_loss.csv")
-    if not os.path.exists(path):
+def try_plot(logs_dir, model_type, label):
+    p = os.path.join(logs_dir, model_type + "_loss.csv")
+    if not os.path.exists(p):
         return False
-    epochs, losses = read_loss_csv(path)
-    plt.plot(epochs, losses, label=label or model_type)
+    e, l = read_loss_csv(p)
+    plt.plot(e, l, label=label)
     return True
 
-# Again, AI assisted. 
+
+# AI assisted
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--logs_dir", type=str, default=r"..\logs")
-    parser.add_argument("--out_name", type=str, default="training_loss_all_models.png")
-    args = parser.parse_args()
+    logs_dir = sys.argv[1]
+    out_name = sys.argv[2]
 
     plt.figure()
 
     any_plotted = False
-    any_plotted |= try_plot(args.logs_dir, "segformer", "SegFormer")
-    any_plotted |= try_plot(args.logs_dir, "deeplab", "DeepLabv3-ResNet50")
-    any_plotted |= try_plot(args.logs_dir, "fair_cnn", "UPerNet-ConvNeXt-T (fair_cnn)")
-    any_plotted |= try_plot(args.logs_dir, "fair_vit", "UPerNet-Swin-T (fair_vit)")
+    any_plotted |= try_plot(logs_dir, "fair_cnn", "UPerNet-ConvNeXt-T (fair_cnn)")
+    any_plotted |= try_plot(logs_dir, "fair_vit", "UPerNet-Swin-T (fair_vit)")
 
     if not any_plotted:
-        raise FileNotFoundError(f"No loss CSVs found in {args.logs_dir}")
+        raise FileNotFoundError("no loss csvs, somethings wrong ben")
 
     plt.xlabel("Epoch")
     plt.ylabel("Training loss")
@@ -49,7 +47,7 @@ def main():
     plt.grid(True)
 
     os.makedirs(r"..\figures", exist_ok=True)
-    out_path = os.path.join(r"..\figures", args.out_name)
+    out_path = os.path.join(r"..\figures", out_name)
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
 

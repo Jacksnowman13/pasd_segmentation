@@ -1,16 +1,13 @@
 import os
-import argparse
+import sys
 
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
 import albumentations as A
 
 from dataset import PASDDataset
-from models_segformer import load_segformer
-from models_deeplab import load_deeplab
 from models_fair import load_fair_cnn, load_fair_vit
 
 
@@ -18,19 +15,9 @@ IGNORE_INDEX = 255
 
 
 def get_dataloader(img_dir, mask_dir, batch_size):
-    transform = A.Compose([
-        A.Resize(512, 512),
-    ])
+    transform = A.Compose([A.Resize(512, 512)])
     ds = PASDDataset(img_dir, mask_dir, transform=transform)
-    loader = DataLoader(
-        ds,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=4,          
-        pin_memory=True,
-        persistent_workers=True
-    )
-    return loader
+    return DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
 
 
 @torch.no_grad()
@@ -48,8 +35,7 @@ def compute_iou_from_confmat(conf_mat):
     fp = conf_mat.sum(dim=0) - tp
     fn = conf_mat.sum(dim=1) - tp
     denom = tp + fp + fn
-    iou = tp / torch.clamp(denom, min=1)
-    return iou
+    return tp / torch.clamp(denom, min=1)
 
 
 def pixel_accuracy_from_confmat(conf_mat):
@@ -58,46 +44,15 @@ def pixel_accuracy_from_confmat(conf_mat):
     return (correct / torch.clamp(total, min=1)).item()
 
 
-def load_model(model_type, num_classes, ckpt_path, device):
-    if model_type == "segformer":
-        model = load_segformer(num_classes)
-    elif model_type == "deeplab":
-        model = load_deeplab(num_classes)
-    elif model_type == "fair_cnn":
-        model = load_fair_cnn(num_classes)
-    elif model_type == "fair_vit":
-        model = load_fair_vit(num_classes)
-    else:
-        raise ValueError(f"Unknown model_type: {model_type}")
-
-    if ckpt_path is None or not os.path.exists(ckpt_path):
-        raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
-
-    state = torch.load(ckpt_path, map_location="cpu")
-    model.load_state_dict(state)
-    model.to(device)
-    model.eval()
-    return model
-
-
 @torch.no_grad()
-def run_eval(model, loader, device, model_type, num_classes):
-    hf_models = ["fair_cnn", "fair_vit"]
-    conf_mat = torch.zeros((num_classes, num_classes), dtype=torch.int64, device="cpu")
+def run_eval(model, loader, device, num_classes):
+    conf_mat = torch.zeros((num_classes, num_classes), dtype=torch.int64)
 
     for imgs, masks in tqdm(loader, desc="Evaluating", leave=True):
         imgs = imgs.to(device, non_blocking=True)
         masks = masks.to(device, non_blocking=True)
 
-        if model_type in hf_models:
-            outputs = model(pixel_values=imgs)
-            logits = outputs.logits
-        elif model_type == "deeplab":
-            outputs = model(imgs)
-            logits = outputs["out"]
-        else:
-            raise ValueError(f"Unknown model_type: {model_type}")
-
+        logits = model(pixel_values=imgs).logits
         logits = F.interpolate(logits, size=masks.shape[-2:], mode="bilinear", align_corners=False)
         preds = torch.argmax(logits, dim=1).long()
 
@@ -110,26 +65,34 @@ def run_eval(model, loader, device, model_type, num_classes):
     return conf_mat, iou.cpu(), miou, pacc
 
 
+# AI assisted
 def main():
-    # AI help: adapted parts from eval_occlusion into this eval script.
-    p = argparse.ArgumentParser()
-    p.add_argument("--img_dir", default=r"..\data\images_val")
-    p.add_argument("--mask_dir", default=r"..\data\masks_val")
-    p.add_argument("--num_classes", type=int, required=True)
-    p.add_argument("--batch_size", type=int, default=4)
-    p.add_argument("--model_type", choices=("segformer", "deeplab", "fair_cnn", "fair_vit"), required=True)
-    p.add_argument("--ckpt", required=True)
-    a = p.parse_args()
+    img_dir = sys.argv[1]
+    mask_dir = sys.argv[2]
+    num_classes = int(sys.argv[3])
+    batch_size = int(sys.argv[4])
+    model_type = sys.argv[5]
+    ckpt = sys.argv[6]
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    loader = get_dataloader(a.img_dir, a.mask_dir, a.batch_size)
-    model = load_model(a.model_type, a.num_classes, a.ckpt, device)
+    loader = get_dataloader(img_dir, mask_dir, batch_size)
 
-    conf_mat, iou, miou, pacc = run_eval(model, loader, device, a.model_type, a.num_classes)
+    if model_type == "fair_cnn":
+        model = load_fair_cnn(num_classes)
+    else:
+        model = load_fair_vit(num_classes)
+
+    model.load_state_dict(torch.load(ckpt, map_location="cpu"))
+    model.to(device)
+    model.eval()
+
+    conf_mat, iou, miou, pacc = run_eval(model, loader, device, num_classes)
+
+    print(f"Mean IoU: {miou:}, Pixel Accuracy: {pacc:}")
 
     os.makedirs(r"..\eval_outputs", exist_ok=True)
-    out_path = os.path.join(r"..\eval_outputs", a.model_type + "_confmat.pt")
+    out_path = os.path.join(r"..\eval_outputs", model_type + "_confmat.pt")
     torch.save(conf_mat, out_path)
 
 

@@ -1,5 +1,5 @@
 import os
-import argparse
+import sys
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -13,98 +13,66 @@ from models_deeplab import load_deeplab
 from models_fair import load_fair_cnn, load_fair_vit
 
 
-def voc_color_map(num_classes=21):
-    cmap = np.zeros((num_classes, 3), dtype=np.uint8)
-    for i in range(num_classes):
-        r = 0
-        g = 0
-        b = 0
+def voc_color_map(n):
+    cmap = np.zeros((n, 3), dtype=np.uint8)
+    for i in range(n):
+        r = g = b = 0
         c = i
         for j in range(8):
             r |= ((c & 1) << (7 - j)); c >>= 1
             g |= ((c & 1) << (7 - j)); c >>= 1
             b |= ((c & 1) << (7 - j)); c >>= 1
-        cmap[i] = np.array([r, g, b], dtype=np.uint8)
+        cmap[i] = [r, g, b]
     return cmap
 
 
 def colorize_mask(mask, cmap):
     h, w = mask.shape
-    color = np.zeros((h, w, 3), dtype=np.uint8)
-    valid = (mask >= 0) & (mask < cmap.shape[0])
-    color[valid] = cmap[mask[valid]]
-    return color
+    out = np.zeros((h, w, 3), dtype=np.uint8)
+    ok = (mask >= 0) & (mask < cmap.shape[0])
+    out[ok] = cmap[mask[ok]]
+    return out
 
+# AI assisted
+def main():
+    MODEL_TYPE  = sys.argv[1]
+    CHECKPOINT  = sys.argv[2]
+    NUM_CLASSES = int(sys.argv[3])
+    NUM_IMAGES  = int(sys.argv[4])
+    VAL_IMG_DIR = sys.argv[5]
+    VAL_MASK_DIR = sys.argv[6]
 
-def build_model(model_type, num_classes, checkpoint_path, device):
-    model = None
-    if model_type == "segformer":
-        model = load_segformer(num_classes)
-    elif model_type == "deeplab":
-        model = load_deeplab(num_classes)
-    elif model_type == "fair_cnn":
-        model = load_fair_cnn(num_classes)
-    elif model_type == "fair_vit":
-        model = load_fair_vit(num_classes)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    tfm = A.Compose([A.Resize(512, 512)])
+    ds = PASDDataset(VAL_IMG_DIR, VAL_MASK_DIR, transform=tfm)
+    loader = DataLoader(ds, batch_size=1, shuffle=True, num_workers=0)
+
+    if MODEL_TYPE == "fair_cnn":
+        model = load_fair_cnn(NUM_CLASSES)
     else:
-        raise ValueError(f"Unknown model_type: {model_type}")
+        model = load_fair_vit(NUM_CLASSES)  
 
-    state_dict = torch.load(checkpoint_path, map_location="cpu")
-    model.load_state_dict(state_dict)
+    model.load_state_dict(torch.load(CHECKPOINT, map_location="cpu"))
     model.to(device)
     model.eval()
-    return model
 
+    cmap = voc_color_map(NUM_CLASSES)
 
-@torch.no_grad()
-def forward_logits(model, imgs, masks, model_type):
-    hf_models = ["fair_cnn", "fair_vit"]
-
-    if model_type in hf_models:
-        logits = model(pixel_values=imgs).logits
-    else:
-        logits = model(imgs)["out"]
-
-    logits = F.interpolate(logits, size=masks.shape[-2:], mode="bilinear", align_corners=False)
-    return logits
-
-#Ai Assisted
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--val_img_dir", type=str, default=r"..\data\images_val")
-    parser.add_argument("--val_mask_dir", type=str, default=r"..\data\masks_val")
-    parser.add_argument("--num_classes", type=int, required=True)
-    parser.add_argument(
-        "--model_type",
-        type=str,
-        choices=["segformer", "deeplab", "fair_cnn", "fair_vit"],
-        required=True,
-    )
-    parser.add_argument("--checkpoint", type=str, required=True)
-    parser.add_argument("--num_images", type=int, default=8)
-    args = parser.parse_args()
-
-    device = "cpu"
-    if torch.cuda.is_available():
-        device = "cuda"
-
-    transform = A.Compose([A.Resize(512, 512)])
-    dataset = PASDDataset(args.val_img_dir, args.val_mask_dir, transform=transform)
-    loader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=0)
-
-    model = build_model(args.model_type, args.num_classes, args.checkpoint, device)
-    cmap = voc_color_map(args.num_classes)
-
-    out_dir = os.path.join(r"..\outputs", f"{args.model_type}_vis")
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir, exist_ok=True)
+    out_dir = os.path.join(r"..\outputs", f"{MODEL_TYPE}_vis")
+    os.makedirs(out_dir, exist_ok=True)
 
     count = 0
     for imgs, masks in loader:
         imgs = imgs.to(device)
         masks = masks.to(device)
 
-        logits = forward_logits(model, imgs, masks, args.model_type)
+        if MODEL_TYPE == "fair_cnn" or MODEL_TYPE == "fair_vit":
+            logits = model(pixel_values=imgs).logits
+        else:
+            logits = model(imgs)["out"]
+
+        logits = F.interpolate(logits, size=masks.shape[-2:], mode="bilinear", align_corners=False)
         preds = torch.argmax(logits, dim=1)
 
         img_np = imgs[0].cpu().permute(1, 2, 0).numpy()
@@ -115,9 +83,12 @@ def main():
         pred_color = colorize_mask(pred_np, cmap)
 
         plt.figure(figsize=(10, 4))
-        plt.subplot(1, 3, 1); plt.imshow(img_np); plt.title("Image"); plt.axis("off")
-        plt.subplot(1, 3, 2); plt.imshow(gt_color); plt.title("Ground truth"); plt.axis("off")
-        plt.subplot(1, 3, 3); plt.imshow(pred_color); plt.title("Prediction"); plt.axis("off")
+        plt.subplot(1, 3, 1); plt.imshow(img_np);
+        plt.title("Image"); plt.axis("off")
+        plt.subplot(1, 3, 2); plt.imshow(gt_color);
+        plt.title("Ground truth"); plt.axis("off")
+        plt.subplot(1, 3, 3); plt.imshow(pred_color);
+        plt.title("Prediction"); plt.axis("off")
         plt.tight_layout()
 
         out_path = os.path.join(out_dir, "example_" + str(count).zfill(3) + ".png")
@@ -125,7 +96,7 @@ def main():
         plt.close()
 
         count += 1
-        if count >= args.num_images:
+        if count >= NUM_IMAGES:
             break
 
 

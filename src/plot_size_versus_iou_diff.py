@@ -1,5 +1,5 @@
 import os
-import argparse
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -13,15 +13,14 @@ def load_iou(confmat_path):
     iou, miou = compute_iou_from_confusion(hist)
     return iou.numpy(), miou
 
-# Bascially all of these main functions are AI assisted because the argument parsing is hard to understand
+
+# AI assisted
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--confmat_ref", type=str, required=True)
-    parser.add_argument("--label_ref", type=str, default="Ref")
-    parser.add_argument("--confmat_cmp", type=str, required=True)
-    parser.add_argument("--label_cmp", type=str, default="Cmp")
-    parser.add_argument("--out_name", type=str, default="size_vs_delta_iou.png")
-    args = parser.parse_args()
+    confmat_ref = sys.argv[1]
+    label_ref = sys.argv[2]
+    confmat_cmp = sys.argv[3]
+    label_cmp = sys.argv[4]
+    out_name = sys.argv[5]
 
     val_img_dir = r"..\data\images_val"
     val_mask_dir = r"..\data\masks_val"
@@ -30,8 +29,8 @@ def main():
     freq[freq == 0] = 1.0
     log_freq = np.log10(freq)
 
-    iou_ref, _ = load_iou(args.confmat_ref)
-    iou_cmp, _ = load_iou(args.confmat_cmp)
+    iou_ref, _ = load_iou(confmat_ref)
+    iou_cmp, _ = load_iou(confmat_cmp)
     diff = iou_cmp - iou_ref
 
     plt.figure(figsize=(8, 5))
@@ -40,12 +39,12 @@ def main():
         plt.text(log_freq[i] + 0.01, diff[i], name, fontsize=8)
 
     plt.xlabel("log10(class pixel count in val)")
-    plt.ylabel(f"ΔIoU ({args.label_cmp} − {args.label_ref})")
+    plt.ylabel(f"ΔIoU ({label_cmp} − {label_ref})")
     plt.title("Class size vs IoU difference")
     plt.grid(True)
 
     os.makedirs(r"..\figures", exist_ok=True)
-    out_path = os.path.join(r"..\figures", args.out_name)
+    out_path = os.path.join(r"..\figures", out_name)
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
 
