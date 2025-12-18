@@ -62,11 +62,6 @@ def train_one_epoch(model, train_loader, optimizer, device, model_type, num_clas
                 mode="bilinear",
                 align_corners=False,
             )
-        elif model_type == "deeplab":
-            outputs = model(imgs)
-            logits = outputs["out"]
-        else:
-            raise ValueError("Uknown model type")
 
         targets = masks.clone().long()
         invalid = (targets < 0) | (targets >= num_classes)
