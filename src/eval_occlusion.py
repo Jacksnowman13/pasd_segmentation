@@ -77,7 +77,7 @@ def update_confusion_matrix(conf_mat, preds, targets, num_classes):
     t = targets[valid].view(-1)
     p = preds[valid].view(-1)
     idx = t * num_classes + p
-    conf_mat += torch.bincount(idx, minlength=num_classes * num_classes).view(num_classes, num_classes)
+    conf_mat += torch.bincount(idx, minlength=num_classes * num_classes).view(num_classes, num_classes) 
     return conf_mat
 
 
@@ -126,6 +126,7 @@ def infer_logits(model, imgs, model_type):
 
 
 @torch.no_grad()
+# AI helped
 def run_occlusion_eval(model, loader, device, model_type, num_classes, occ_type, severity):
     clean_conf = torch.zeros((num_classes, num_classes), dtype=torch.int64)
     occ_conf = torch.zeros((num_classes, num_classes), dtype=torch.int64)
@@ -190,7 +191,7 @@ def main():
     clean_iou, occ_iou, clean_miou, occ_miou, delta = run_occlusion_eval(
         model, loader, device, a.model_type, a.num_classes, a.occ_type, a.severity
     )
-
+    
     print(f"\nClean mIoU={clean_miou:.4f}  Occluded mIoU={occ_miou:.4f}  ΔmIoU={delta:.4f}")
     for c in range(a.num_classes):
         print(f"class {c:02d}: {clean_iou[c].item():.4f}->{occ_iou[c].item():.4f}")

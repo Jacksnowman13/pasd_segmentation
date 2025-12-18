@@ -93,7 +93,7 @@ def save_side_by_side(img_tensor, gt_mask, pred_a, pred_b, cmap, out_path, label
 
 
 def main():
-    # AI assisted argument parsing
+    # AI assisted 
     parser = argparse.ArgumentParser()
     parser.add_argument("--val_img_dir", type=str, default=r"..\data\images_val")
     parser.add_argument("--val_mask_dir", type=str, default=r"..\data\masks_val")

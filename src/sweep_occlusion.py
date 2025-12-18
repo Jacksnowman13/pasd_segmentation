@@ -6,7 +6,7 @@ import torch
 from pathlib import Path
 
 
-# Debugged with the help of ChatGPT, particularly explaining subprocess usage
+# Debugged with the help of ChatGPT
 def run_one(model_type, ckpt, occ_type, severity, seed, num_classes, batch_size):
     cmd = [
         "python", "eval_occlusion.py",

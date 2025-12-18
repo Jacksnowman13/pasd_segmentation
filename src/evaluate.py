@@ -40,7 +40,6 @@ def evaluate(model, val_loader, device, num_classes, model_type):
 
     return iou_per_class, miou, pixel_acc
 
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--val_img_dir", type=str, default=r"..\data_raw\val\img")

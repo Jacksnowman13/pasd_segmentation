@@ -157,7 +157,7 @@ def main():
             args.num_classes,
         )
 
-        print(f"Epoch {epoch+1}/{args.epochs} - train loss: {train_loss:.4f}")
+        print(f"Epoch {epoch+1}/{args.epochs} - train loss: {train_loss}")
 
         f = open(log_path, "a")
         f.write(f"{epoch+1},{train_loss}\n")
@@ -166,7 +166,6 @@ def main():
         if train_loss < best_loss:
             best_loss = train_loss
             ckpt = os.path.join(args.save_path, f"{args.model_type}_best.pt")
-            print(f"Saving new best model to {ckpt}")
             torch.save(model.state_dict(), ckpt)
 
         epoch += 1

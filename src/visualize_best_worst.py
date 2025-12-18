@@ -157,7 +157,7 @@ def main():
         img_tensor, mask_tensor = val_ds[idx]
         preds = predict_mask(model, img_tensor, mask_tensor, device, args.model_type)
         out_path = os.path.join(out_root, f"worst_{rank}_idx{idx}_miou{miou:.3f}.png")
-        save_triptych(img_tensor, mask_tensor, preds, cmap, out_path, title=f"Worst {rank} (idx={idx}, mIoU={miou:.3f})")
+        save_triptych(img_tensor, mask_tensor, preds, cmap, out_path, title=f"Worst {rank} (idx={idx}, mIoU={miou})")
         rank += 1
 
     rank = 0
@@ -166,7 +166,7 @@ def main():
         img_tensor, mask_tensor = val_ds[idx]
         preds = predict_mask(model, img_tensor, mask_tensor, device, args.model_type)
         out_path = os.path.join(out_root, f"best_{rank}_idx{idx}_miou{miou:.3f}.png")
-        save_triptych(img_tensor, mask_tensor, preds, cmap, out_path, title=f"Best {rank} (idx={idx}, mIoU={miou:.3f})")
+        save_triptych(img_tensor, mask_tensor, preds, cmap, out_path, title=f"Best {rank} (idx={idx}, mIoU={miou})")
         rank += 1
 
 

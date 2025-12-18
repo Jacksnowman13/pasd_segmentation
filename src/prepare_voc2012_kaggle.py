@@ -6,10 +6,6 @@ VOC_ROOT = r"C:\projects\pasd_segmentation\data_raw\archive\VOC2012"
 
 JPEG_DIR = os.path.join(VOC_ROOT, "JPEGImages")
 SEG_DIR = os.path.join(VOC_ROOT, "SegmentationClass")
-
-assert os.path.isdir(JPEG_DIR), f"No JPEGImages folder at {JPEG_DIR}"
-assert os.path.isdir(SEG_DIR), f"No SegmentationClass folder at {SEG_DIR}"
-
 PROJECT_ROOT = r"C:\projects\pasd_segmentation"
 OUT_DATA = os.path.join(PROJECT_ROOT, "data")
 OUT_TRAIN_IMG = os.path.join(OUT_DATA, "images_train")
@@ -44,7 +40,7 @@ def main():
 
     random.seed(42)
     random.shuffle(ids)
-
+    
     split_idx = int(0.8 * len(ids))
     train_ids = ids[:split_idx]
     val_ids = ids[split_idx:]

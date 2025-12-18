@@ -3,7 +3,6 @@ import csv
 import argparse
 import matplotlib.pyplot as plt
 
-# Wasn't AI assisted, I figured this one out on my own
 def read_loss_csv(path):
     epochs, losses = [], []
     with open(path, "r") as f:
@@ -53,7 +52,6 @@ def main():
     out_path = os.path.join(r"..\figures", args.out_name)
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
-    print(f"Saved training curve plot to {out_path}")
 
 
 if __name__ == "__main__":

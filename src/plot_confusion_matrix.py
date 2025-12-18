@@ -79,9 +79,9 @@ def get_val_loader(val_img_dir, val_mask_dir, batch_size=2):
 def compute_model_confusion(model, val_loader, device, num_classes, model_type):
     preds_list = []
     labels_list = []
-    hf_models = ["segformer", "fair_cnn", "fair_vit"]
+    hf_models = ["fair_cnn", "fair_vit"]
 
-    for imgs, masks in tqdm(val_loader, desc="Computing confusion"):
+    for imgs, masks in tqdm(val_loader, desc="Confusion"):
         imgs = imgs.to(device, non_blocking=True)
         masks = masks.to(device, non_blocking=True)
 
@@ -151,7 +151,7 @@ def main():
         out_path=os.path.join(figures_dir, base + "_log.png"),
         values_format=".2f",
     )
-
+    
     row_sums = cm.sum(axis=1, keepdims=True) + 1e-6
     cm_norm = cm / row_sums
     plot_cm_sklearn(
