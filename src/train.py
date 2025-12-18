@@ -45,7 +45,7 @@ def train_one_epoch(model, train_loader, optimizer, device, model_type, num_clas
     model.train()
     total_loss = 0.0
 
-    hf_models = ["segformer", "fair_cnn", "fair_vit"]
+    hf_models = ["fair_cnn", "fair_vit"]
 
     for imgs, masks in tqdm(train_loader, desc="Training", leave=False):
         imgs = imgs.to(device, non_blocking = True)
